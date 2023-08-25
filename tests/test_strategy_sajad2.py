@@ -33,26 +33,31 @@ import backtrader as bt
 
 
 class TestStrategy(bt.Strategy):
-    params = [
-        ("rsi_period", 13),
-    ]
+    def __init__(self, params=None) -> None:
+        self.watched_order_statuses = ["margin"]
+        self.order = None
+        self.first_time = True
 
-    def __init__(self, *args, **kwargs) -> None:
-        self.rsi = bt.ind.RSI(self.datas[0], period=14)
-        self.ichimoku_sym = bt.ind.Ichimoku(self.datas[0])
+    def should_trade(self):
+        return self.datetime.date().day >= 15 or self.datetime.date().day <= 2
 
-        self.inpos = False
-        self.exit_buy_signal = True
+    def notify_order(self, order: bt.Order):
+        print("order status", order.status)
+        print("day of month", self.datetime.date().day)
+        if not self.should_trade():
+            if order and order.status in [bt.Order.Submitted, bt.Order.Accepted]:
+                print("fucking here")
+                self.cancel(order)
 
     def next(self):
-        print(self.p.rsi_period)
-        if not self.inpos and self.exit_buy_signal:
-            self.sell(size=0.000001)
-            self.inpos = True
-        elif self.exit_buy_signal:
-            self.close()
-            self.inpos = False
-            self.exit_buy_signal = False
+        if self.position:
+            print("SELL CREATE, %.2f" % self.data.close[0])
+            self.sell()
+        elif self.first_time:
+            price = 3000
+            print("order set")
+            self.buy(exectype=bt.Order.Stop, price=price)
+            self.first_time = False
 
 
 chkdatas = 1
@@ -66,8 +71,6 @@ def test_run(main=False):
         runonce=True,
         preload=True,
         exbar=False,
-        printdata=main,
-        printops=main,
         plot=main,
     )
 
